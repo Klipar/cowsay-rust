@@ -2,7 +2,7 @@ use std::env;
 use std::io::{self, Read};
 use std::process::ExitCode;
 
-use cowsay_rust::{CowKind, render_with_kind};
+use cowsay_rust::{CowKind, available_cow_names, random_cow_kind, render_with_kind};
 
 fn main() -> ExitCode {
     match run() {
@@ -20,6 +20,7 @@ fn run() -> Result<(), String> {
     let mut eyes = "oo".to_string();
     let mut tongue = String::new();
     let mut no_wrap = false;
+    let mut color_mode = false;
     let mut kind = CowKind::Cow;
     let mut message_parts = Vec::new();
 
@@ -29,6 +30,16 @@ fn run() -> Result<(), String> {
             "-h" | "--help" => {
                 print_help();
                 return Ok(());
+            }
+            "-l" | "--list" => {
+                print_cow_list();
+                return Ok(());
+            }
+            "-r" | "--random" => {
+                kind = random_cow_kind();
+            }
+            "-C" | "--color" => {
+                color_mode = true;
             }
             "-e" | "--eyes" => {
                 let next = args.next().ok_or_else(|| "Missing value for --eyes".to_string())?;
@@ -84,8 +95,35 @@ fn run() -> Result<(), String> {
     }
 
     let rendered = render_with_kind(&message, width, &eyes, &tongue, kind);
-    println!("{rendered}");
+    let output = if color_mode {
+        colorize(rendered)
+    } else {
+        rendered
+    };
+    println!("{output}");
     Ok(())
+}
+
+fn colorize(text: String) -> String {
+    let mut colored = String::new();
+    for (index, ch) in text.chars().enumerate() {
+        if ch == '\n' {
+            colored.push(ch);
+            continue;
+        }
+        let code = match index % 6 {
+            0 => "\u{001b}[31m",
+            1 => "\u{001b}[32m",
+            2 => "\u{001b}[33m",
+            3 => "\u{001b}[34m",
+            4 => "\u{001b}[35m",
+            _ => "\u{001b}[36m",
+        };
+        colored.push_str(code);
+        colored.push(ch);
+        colored.push_str("\u{001b}[0m");
+    }
+    colored
 }
 
 fn parse_cowfile(name: &str) -> CowKind {
@@ -100,20 +138,22 @@ fn parse_cowfile(name: &str) -> CowKind {
 fn print_help() {
     println!("Usage: cowsay-rust [OPTION]... [MESSAGE]");
     println!();
-    println!("  -b             Borg mode");
-    println!("  -d             Dead mode");
-    println!("  -e, --eyes     Select eye characters");
-    println!("  -f, --cowfile Select a built-in cow style");
-    println!("  -g             Greedy mode");
-    println!("  -h, --help     Display this help text");
-    println!("  -n, --no-wrap Disable word wrapping");
-    println!("  -p             Paranoid mode");
-    println!("  -s             Stoned mode");
-    println!("  -T, --tongue  Select tongue character(s)");
-    println!("  -t             Tired mode");
-    println!("  -W, --width   Set the width of the speech bubble");
-    println!("  -w             Wired mode");
-    println!("  -y             Youthful mode");
+    println!("  -b, -d, -g, -p, -s, -t, -w, -y  Appearance modes");
+    println!("  -C, --color     Enable ANSI color output");
+    println!("  -e, --eyes      Select eye characters");
+    println!("  -f, --cowfile  Select a built-in cow style or file name");
+    println!("  -h, --help      Display this help text");
+    println!("  -l, --list      List available cow files");
+    println!("  -n, --no-wrap  Disable word wrapping");
+    println!("  -r, --random   Pick a random cow style");
+    println!("  -T, --tongue   Select tongue character(s)");
+    println!("  -W, --width    Set the width of the speech bubble");
     println!();
-    println!("Built-in cow styles: cow, beavis.zen, stegosaurus");
+    println!("Built-in cow styles: {}", available_cow_names().join(", "));
+}
+
+fn print_cow_list() {
+    for name in available_cow_names() {
+        println!("{name}");
+    }
 }

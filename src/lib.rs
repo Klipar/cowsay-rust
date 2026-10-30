@@ -1,3 +1,7 @@
+use std::collections::BTreeSet;
+use std::env;
+use std::fs;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CowKind {
     Cow,
@@ -11,6 +15,98 @@ pub enum CowKind {
     Tired,
     Wired,
     Youthful,
+}
+
+pub fn available_cow_names() -> Vec<String> {
+    let mut names = BTreeSet::new();
+
+    for name in [
+        "default",
+        "beavis.zen",
+        "stegosaurus",
+        "borg",
+        "dead",
+        "greedy",
+        "paranoid",
+        "stoned",
+        "tired",
+        "wired",
+        "young",
+    ] {
+        names.insert(name.to_string());
+    }
+
+    for dir in cowfile_search_dirs() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+
+            if !file_name.ends_with(".cow") {
+                continue;
+            }
+
+            let name = file_name.strip_suffix(".cow").unwrap_or(file_name);
+            let normalized = name.replace('_', ".");
+            let cleaned = normalized.trim();
+            if !cleaned.is_empty() {
+                names.insert(cleaned.to_string());
+            }
+        }
+    }
+
+    let mut ordered = names.into_iter().collect::<Vec<_>>();
+    ordered.sort();
+    ordered
+}
+
+pub fn random_cow_kind() -> CowKind {
+    let kinds = [
+        CowKind::Cow,
+        CowKind::BeavisZen,
+        CowKind::Stegosaurus,
+        CowKind::Borg,
+        CowKind::Dead,
+        CowKind::Greedy,
+        CowKind::Paranoid,
+        CowKind::Stoned,
+        CowKind::Tired,
+        CowKind::Wired,
+        CowKind::Youthful,
+    ];
+
+    let index = rand::random::<usize>() % kinds.len();
+    kinds[index]
+}
+
+fn cowfile_search_dirs() -> Vec<String> {
+    let mut dirs = Vec::new();
+
+    for candidate in [
+        "/usr/share/cowsay/cows",
+        "/usr/share/cowsay/site-cows",
+        "/usr/local/share/cowsay/cows",
+        "/usr/local/share/cowsay/site-cows",
+    ] {
+        if fs::metadata(candidate).is_ok() {
+            dirs.push(candidate.to_string());
+        }
+    }
+
+    if let Ok(value) = env::var("COWPATH") {
+        for part in value.split(':') {
+            if !part.is_empty() && fs::metadata(part).is_ok() {
+                dirs.push(part.to_string());
+            }
+        }
+    }
+
+    dirs
 }
 
 pub fn wrap_text(message: &str, width: usize) -> Vec<String> {
@@ -176,5 +272,30 @@ mod tests {
         let wrapped = wrap_text("віііііііііііііііііііііі", 7);
         assert!(!wrapped.is_empty());
         assert!(wrapped.iter().all(|line| line.chars().count() <= 7));
+    }
+
+    #[test]
+    fn cow_catalog_contains_real_names() {
+        let names = available_cow_names();
+        assert!(names.iter().any(|name| name == "default" || name == "beavis.zen"));
+    }
+
+    #[test]
+    fn random_cow_kind_is_valid() {
+        let kind = random_cow_kind();
+        assert!(matches!(
+            kind,
+            CowKind::Cow
+                | CowKind::BeavisZen
+                | CowKind::Stegosaurus
+                | CowKind::Borg
+                | CowKind::Dead
+                | CowKind::Greedy
+                | CowKind::Paranoid
+                | CowKind::Stoned
+                | CowKind::Tired
+                | CowKind::Wired
+                | CowKind::Youthful
+        ));
     }
 }
