@@ -1,19 +1,28 @@
-# cowsay-rust
+# CowSay-Rust
 
-A Rust implementation of the classic `cowsay` utility. The program prints text inside a speech bubble and displays a cow or another styled template beneath it.
+We all know that __one of the most important utilities__ in the Linux world is `cowsay`. This unassuming little program is actually installed on countless machines.
 
-The project aims to stay as close as possible to the original `cowsay`: it supports the main flags, line wrapping, different cow styles, and bundled cowfile templates so it can run without depending on the system-installed `cowsay`.
+However, so far, I haven't been able to find a secure version of it rewritten in **Rust**. This means it could potentially be unsafe and contain critical security vulnerabilities.
 
-## What is this?
+So, to address this gap and get some hands-on experience with modern `vibe-coding` tools, this repository was created.
 
-`cowsay` is a small terminal utility that displays text as speech from a character, usually a cow. It is often used for:
+It is a clone of the [cowsay](https://en.wikipedia.org/wiki/Cowsay) program [github](https://github.com/cowsay-org/cowsay?tab=readme-ov-file).
 
-- displaying short messages in the console
-- showing information in a styled speech bubble
-- demonstrating different cow patterns and mascot art
-- showcasing text wrapping and formatting behavior
+``` bash
+$ cargo run -- "hello"
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/debug/cowsay-rust hello`
+ _______
+< hello >
+ -------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+```
 
-This project provides a Rust version designed to closely match the original tool in the main usage scenarios.
+# How to use (if you want to make your `cowsay` experience safe :D)
 
 ## Requirements
 
@@ -80,18 +89,3 @@ export PATH="$HOME/.cargo/bin:$PATH"
 ## License
 
 The project preserves the appropriate GPL license for bundled cowfile resources and graphic templates so the `cowsay` analog can be used as a standalone tool without depending on the system utility.
-
-## Development
-
-```bash
-cargo build
-cargo test
-```
-
-## Summary
-
-After cloning the repository, you can:
-
-1. run the program with `cargo run`,
-2. install it with `cargo install --path .`,
-3. use it as a local `cowsay` alternative in the terminal.
