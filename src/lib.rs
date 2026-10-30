@@ -25,6 +25,7 @@ pub fn wrap_text(message: &str, width: usize) -> Vec<String> {
 
     let mut lines = Vec::new();
     let mut current = String::new();
+    let split_width = if width <= 1 { 1 } else { width - 1 };
 
     for word in trimmed.split_whitespace() {
         if word.chars().count() > width {
@@ -35,7 +36,7 @@ pub fn wrap_text(message: &str, width: usize) -> Vec<String> {
 
             let mut chunk = String::new();
             for ch in word.chars() {
-                if chunk.chars().count() + 1 > width {
+                if chunk.chars().count() + 1 > split_width {
                     lines.push(chunk.clone());
                     chunk.clear();
                 }
@@ -86,8 +87,17 @@ pub fn render_with_kind(
     let wrapped = wrap_text(message, width);
     let max_len = wrapped.iter().map(|line| line.chars().count()).max().unwrap_or(0);
 
-    let top = format!(" {} ", "_".repeat(max_len + 2));
-    let bottom = format!(" {} ", "-".repeat(max_len + 2));
+    if wrapped.len() == 1 {
+        let top = "_".repeat(max_len + 2);
+        let bottom = "-".repeat(max_len + 2);
+        let bubble = format!("< {} >", wrapped[0]);
+        let art = cow_art(kind, eyes, tongue);
+        return format!(" {top}\n{bubble}\n {bottom}\n{art}");
+    }
+
+    let border_width = max_len + 2;
+    let top = "_".repeat(border_width);
+    let bottom = "-".repeat(border_width);
     let bubble = wrapped
         .iter()
         .enumerate()
@@ -104,7 +114,7 @@ pub fn render_with_kind(
         .join("\n");
 
     let art = cow_art(kind, eyes, tongue);
-    format!("{top}\n{bubble}\n{bottom}\n{art}")
+    format!(" {top}\n{bubble}\n {bottom}\n{art}")
 }
 
 fn cow_art(kind: CowKind, eyes: &str, tongue: &str) -> String {
