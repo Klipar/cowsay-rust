@@ -2,7 +2,11 @@ use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+mod bundled_cows;
+
+use bundled_cows::BUNDLED_COWS;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CowKind {
     Cow,
     BeavisZen,
@@ -15,10 +19,15 @@ pub enum CowKind {
     Tired,
     Wired,
     Youthful,
+    File(String),
 }
 
 pub fn available_cow_names() -> Vec<String> {
     let mut names = BTreeSet::new();
+
+    for (name, _) in BUNDLED_COWS {
+        names.insert((*name).to_string());
+    }
 
     for name in [
         "default",
@@ -66,26 +75,30 @@ pub fn available_cow_names() -> Vec<String> {
 }
 
 pub fn random_cow_kind() -> CowKind {
-    let kinds = [
-        CowKind::Cow,
-        CowKind::BeavisZen,
-        CowKind::Stegosaurus,
-        CowKind::Borg,
-        CowKind::Dead,
-        CowKind::Greedy,
-        CowKind::Paranoid,
-        CowKind::Stoned,
-        CowKind::Tired,
-        CowKind::Wired,
-        CowKind::Youthful,
-    ];
+    let names = available_cow_names();
+    if names.is_empty() {
+        return CowKind::Cow;
+    }
 
-    let index = rand::random::<usize>() % kinds.len();
-    kinds[index]
+    let pick = &names[rand::random::<usize>() % names.len()];
+    if pick == "default" {
+        CowKind::Cow
+    } else if pick == "beavis.zen" {
+        CowKind::BeavisZen
+    } else if pick == "stegosaurus" {
+        CowKind::Stegosaurus
+    } else {
+        CowKind::File(pick.clone())
+    }
 }
 
 fn cowfile_search_dirs() -> Vec<String> {
     let mut dirs = Vec::new();
+
+    let bundled = format!("{}/assets/cows", env!("CARGO_MANIFEST_DIR"));
+    if fs::metadata(&bundled).is_ok() {
+        dirs.push(bundled);
+    }
 
     for candidate in [
         "/usr/share/cowsay/cows",
@@ -107,6 +120,133 @@ fn cowfile_search_dirs() -> Vec<String> {
     }
 
     dirs
+}
+
+fn resolve_cowfile_path(name: &str) -> Option<String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let path = std::path::Path::new(trimmed);
+    if path.is_absolute() && path.exists() {
+        return Some(path.to_string_lossy().to_string());
+    }
+
+    let bare = trimmed.strip_suffix(".cow").unwrap_or(trimmed);
+    let candidates = [
+        trimmed.to_string(),
+        format!("{trimmed}.cow"),
+        bare.to_string(),
+        format!("{bare}.cow"),
+    ];
+
+    for candidate in candidates {
+        if std::path::Path::new(&candidate).exists() {
+            return Some(candidate);
+        }
+    }
+
+    for dir in cowfile_search_dirs() {
+        for candidate in [
+            format!("{dir}/{trimmed}"),
+            format!("{dir}/{trimmed}.cow"),
+            format!("{dir}/{bare}"),
+            format!("{dir}/{bare}.cow"),
+        ] {
+            if std::path::Path::new(&candidate).exists() {
+                return Some(candidate);
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_cow_template(contents: &str) -> Option<String> {
+    let mut in_template = false;
+    let mut marker: Option<String> = None;
+    let mut lines = Vec::new();
+
+    for line in contents.lines() {
+        if !in_template {
+            if !line.contains("$the_cow") {
+                continue;
+            }
+
+            let after = line.split("$the_cow").nth(1).unwrap_or("");
+            let marker_part = after
+                .find("<<")
+                .map(|pos| &after[pos + 2..])
+                .unwrap_or("");
+
+            if let Some(stripped) = marker_part.strip_prefix('"') {
+                if let Some(end) = stripped.find('"') {
+                    marker = Some(stripped[..end].to_string());
+                }
+            } else {
+                let normalized = marker_part.trim_end_matches(';');
+                if !normalized.trim().is_empty() {
+                    marker = Some(normalized.to_string());
+                }
+            }
+
+            in_template = marker.is_some();
+            continue;
+        }
+
+        if marker.as_ref().is_some_and(|m| line.contains(m)) {
+            break;
+        }
+
+        lines.push(line.to_string());
+    }
+
+    if lines.is_empty() {
+        None
+    } else {
+        Some(lines.join("\n"))
+    }
+}
+
+fn bundled_cow_template(name: &str) -> Option<&'static str> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let bare = trimmed.strip_suffix(".cow").unwrap_or(trimmed);
+    let normalized = bare.replace('_', ".");
+    let candidates = [trimmed, bare, normalized.as_str()];
+
+    BUNDLED_COWS
+        .iter()
+        .find(|(key, _)| candidates.iter().any(|candidate| *key == *candidate))
+        .map(|(_, template)| *template)
+}
+
+fn render_cowfile_art(name: &str, eyes: &str, tongue: &str) -> Option<String> {
+    if let Some(raw) = bundled_cow_template(name) {
+        let template = extract_cow_template(raw).unwrap_or(raw.to_string());
+        let rendered = template
+            .replace("$thoughts", "\\")
+            .replace("$eyes", eyes)
+            .replace("$tongue", tongue)
+            .replace("\\\\", "\\");
+        return Some(rendered);
+    }
+
+    let path = resolve_cowfile_path(name)?;
+    let content = fs::read_to_string(path).ok()?;
+    let template = extract_cow_template(&content)?;
+
+    let rendered = template
+        .replace("$thoughts", "\\")
+        .replace("$eyes", eyes)
+        .replace("$tongue", tongue)
+        .replace("\\\\", "\\");
+
+    Some(rendered)
 }
 
 pub fn wrap_text(message: &str, width: usize) -> Vec<String> {
@@ -214,6 +354,12 @@ pub fn render_with_kind(
 }
 
 fn cow_art(kind: CowKind, eyes: &str, tongue: &str) -> String {
+    if let CowKind::File(name) = &kind {
+        if let Some(custom) = render_cowfile_art(name, eyes, tongue) {
+            return custom;
+        }
+    }
+
     let effective_eyes = match kind {
         CowKind::Cow => eyes,
         CowKind::BeavisZen => "xx",
@@ -226,6 +372,7 @@ fn cow_art(kind: CowKind, eyes: &str, tongue: &str) -> String {
         CowKind::Tired => "--",
         CowKind::Wired => "OO",
         CowKind::Youthful => "..",
+        CowKind::File(_) => unreachable!(),
     };
 
     let effective_tongue = if tongue.trim().is_empty() { "" } else { tongue };
@@ -296,6 +443,13 @@ mod tests {
                 | CowKind::Tired
                 | CowKind::Wired
                 | CowKind::Youthful
+                | CowKind::File(_)
         ));
+    }
+
+    #[test]
+    fn custom_cow_file_renders_from_system_template() {
+        let rendered = render_with_kind("hello", 40, "oo", " ", CowKind::File("dragon".to_string()));
+        assert!(rendered.contains("/ \\"));
     }
 }

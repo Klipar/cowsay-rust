@@ -127,11 +127,38 @@ fn colorize(text: String) -> String {
 }
 
 fn parse_cowfile(name: &str) -> CowKind {
-    match name.to_ascii_lowercase().as_str() {
+    let normalized = name.trim();
+    if normalized.is_empty() {
+        return CowKind::Cow;
+    }
+
+    let lower = normalized.to_ascii_lowercase();
+    let lower = lower.replace('_', ".");
+
+    match lower.as_str() {
         "cow" | "default" => CowKind::Cow,
-        "beavis.zen" | "beavis_zen" | "beavis" => CowKind::BeavisZen,
+        "beavis.zen" | "beavis" => CowKind::BeavisZen,
         "stegosaurus" => CowKind::Stegosaurus,
-        _ => CowKind::Cow,
+        "borg" => CowKind::Borg,
+        "dead" => CowKind::Dead,
+        "greedy" => CowKind::Greedy,
+        "paranoid" => CowKind::Paranoid,
+        "stoned" => CowKind::Stoned,
+        "tired" => CowKind::Tired,
+        "wired" => CowKind::Wired,
+        "young" => CowKind::Youthful,
+        _ => {
+            if normalized.contains('/') || normalized.contains('.') || std::path::Path::new(normalized).exists() {
+                CowKind::File(normalized.to_string())
+            } else {
+                let candidate = normalized.to_string();
+                if std::path::Path::new(&format!("{candidate}.cow")).exists() {
+                    CowKind::File(candidate)
+                } else {
+                    CowKind::File(candidate)
+                }
+            }
+        }
     }
 }
 
