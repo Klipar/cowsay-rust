@@ -77,6 +77,11 @@ fn run() -> Result<(), String> {
         }
     }
 
+    if no_wrap && !message_parts.is_empty() {
+        print_help();
+        return Err("-n is only valid with stdin input in upstream cowsay".to_string());
+    }
+
     if message_parts.is_empty() {
         let mut stdin = String::new();
         io::stdin().read_to_string(&mut stdin).map_err(|err| err.to_string())?;

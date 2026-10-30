@@ -383,14 +383,14 @@ fn cow_art(kind: CowKind, eyes: &str, tongue: &str) -> String {
         }
         CowKind::Stegosaurus => String::from("       _______________                 _______________\n     _/               \\_           _/               \\_\n    /  _   ___   ___   \\         /  _   ___   ___   \\\n   /  / \\ / _ \\ / _ \\  \\\n      \\_/ \\___/ \\___/  \\_\n"),
         _ => {
-            let tongue_segment = if effective_tongue.is_empty() {
-                String::new()
+            let tongue_line = if effective_tongue.is_empty() {
+                "                ||----w |".to_string()
             } else {
-                effective_tongue.to_string()
+                format!("             {effective_tongue} ||----w |")
             };
 
             format!(
-                "        \\   ^__^\n         \\  ({effective_eyes})\\_______\n            (__)\\       )\\/\\\n                ||{tongue_segment}----w |\n                ||     ||"
+                "        \\   ^__^\n         \\  ({effective_eyes})\\_______\n            (__)\\       )\\/\\\n{tongue_line}\n                ||     ||"
             )
         }
     }
@@ -451,5 +451,12 @@ mod tests {
     fn custom_cow_file_renders_from_system_template() {
         let rendered = render_with_kind("hello", 40, "oo", " ", CowKind::File("dragon".to_string()));
         assert!(rendered.contains("/ \\"));
+    }
+
+    #[test]
+    fn built_in_tongue_is_inserted_before_the_muzzle() {
+        let rendered = render_with_kind("hello", 40, "oo", "..", CowKind::Cow);
+        assert!(rendered.contains(".. ||----w |"));
+        assert!(!rendered.contains("||..----w |"));
     }
 }
