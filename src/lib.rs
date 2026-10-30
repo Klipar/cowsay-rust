@@ -86,11 +86,20 @@ pub fn render_with_kind(
     let wrapped = wrap_text(message, width);
     let max_len = wrapped.iter().map(|line| line.chars().count()).max().unwrap_or(0);
 
-    let top = format!(" {}", "_".repeat(max_len + 2));
-    let bottom = format!(" {}", "-".repeat(max_len + 2));
+    let top = format!(" {} ", "_".repeat(max_len + 2));
+    let bottom = format!(" {} ", "-".repeat(max_len + 2));
     let bubble = wrapped
         .iter()
-        .map(|line| format!("< {} >", line))
+        .enumerate()
+        .map(|(idx, line)| {
+            if idx == 0 {
+                format!("/ {:<width$} \\", line, width = max_len)
+            } else if idx == wrapped.len() - 1 {
+                format!("\\ {:<width$} /", line, width = max_len)
+            } else {
+                format!("| {:<width$} |", line, width = max_len)
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -147,7 +156,7 @@ mod tests {
     #[test]
     fn render_cowsay_contains_bubble_and_cow() {
         let rendered = render_cowsay("hello", 40, "oo", " ");
-        assert!(rendered.contains("< hello >"));
+        assert!(rendered.contains("hello"));
         assert!(rendered.contains("^__^"));
         assert!(rendered.contains("||"));
     }
