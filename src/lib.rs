@@ -225,14 +225,51 @@ fn bundled_cow_template(name: &str) -> Option<&'static str> {
         .map(|(_, template)| *template)
 }
 
+fn unescape_cowfile_escapes(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut output = String::with_capacity(input.len());
+    let mut i = 0;
+
+    while i < chars.len() {
+        if chars[i] == '\\' && i + 1 < chars.len() {
+            let next = chars[i + 1];
+            let replacement = match next {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                '0' => '\0',
+                'a' => '\u{07}',
+                'b' => '\u{08}',
+                'f' => '\u{0C}',
+                'v' => '\u{0B}',
+                '\\' | '\'' | '"' | '@' | '_' | '/' | '{' | '}' | '~' | '-' | '.' | '|' | '(' | ')' | '[' | ']' | ';' | ':' | '!' | '?' | '#' | '$' | '%' | '^' | '&' | '*' | '+' | '=' | ',' => next,
+                _ => {
+                    output.push('\\');
+                    output.push(next);
+                    i += 2;
+                    continue;
+                }
+            };
+            output.push(replacement);
+            i += 2;
+        } else {
+            output.push(chars[i]);
+            i += 1;
+        }
+    }
+
+    output
+}
+
 fn render_cowfile_art(name: &str, eyes: &str, tongue: &str) -> Option<String> {
     if let Some(raw) = bundled_cow_template(name) {
         let template = extract_cow_template(raw).unwrap_or(raw.to_string());
-        let rendered = template
-            .replace("$thoughts", "\\")
-            .replace("$eyes", eyes)
-            .replace("$tongue", tongue)
-            .replace("\\\\", "\\");
+        let rendered = unescape_cowfile_escapes(
+            &template
+                .replace("$thoughts", "\\")
+                .replace("$eyes", eyes)
+                .replace("$tongue", tongue),
+        );
         return Some(rendered);
     }
 
@@ -240,11 +277,12 @@ fn render_cowfile_art(name: &str, eyes: &str, tongue: &str) -> Option<String> {
     let content = fs::read_to_string(path).ok()?;
     let template = extract_cow_template(&content)?;
 
-    let rendered = template
-        .replace("$thoughts", "\\")
-        .replace("$eyes", eyes)
-        .replace("$tongue", tongue)
-        .replace("\\\\", "\\");
+    let rendered = unescape_cowfile_escapes(
+        &template
+            .replace("$thoughts", "\\")
+            .replace("$eyes", eyes)
+            .replace("$tongue", tongue),
+    );
 
     Some(rendered)
 }
@@ -261,10 +299,10 @@ pub fn wrap_text(message: &str, width: usize) -> Vec<String> {
 
     let mut lines = Vec::new();
     let mut current = String::new();
-    let split_width = if width <= 1 { 1 } else { width - 1 };
+    let effective_width = if width <= 1 { 1 } else { width - 1 };
 
     for word in trimmed.split_whitespace() {
-        if word.chars().count() > width {
+        if word.chars().count() > effective_width {
             if !current.is_empty() {
                 lines.push(current.clone());
                 current.clear();
@@ -272,7 +310,7 @@ pub fn wrap_text(message: &str, width: usize) -> Vec<String> {
 
             let mut chunk = String::new();
             for ch in word.chars() {
-                if chunk.chars().count() + 1 > split_width {
+                if chunk.chars().count() + 1 > effective_width {
                     lines.push(chunk.clone());
                     chunk.clear();
                 }
@@ -290,7 +328,7 @@ pub fn wrap_text(message: &str, width: usize) -> Vec<String> {
             format!("{} {}", current, word)
         };
 
-        if candidate.chars().count() <= width {
+        if candidate.chars().count() <= effective_width {
             current = candidate;
         } else {
             lines.push(current.clone());
@@ -375,7 +413,11 @@ fn cow_art(kind: CowKind, eyes: &str, tongue: &str) -> String {
         CowKind::File(_) => unreachable!(),
     };
 
-    let effective_tongue = if tongue.trim().is_empty() { "" } else { tongue };
+    let effective_tongue = match kind {
+        CowKind::Dead | CowKind::Stoned => "U",
+        _ if tongue.trim().is_empty() => "",
+        _ => tongue,
+    };
 
     match kind {
         CowKind::BeavisZen => {
@@ -385,6 +427,8 @@ fn cow_art(kind: CowKind, eyes: &str, tongue: &str) -> String {
         _ => {
             let tongue_line = if effective_tongue.is_empty() {
                 "                ||----w |".to_string()
+            } else if effective_tongue == "U" {
+                format!("             {effective_tongue}  ||----w |")
             } else {
                 format!("             {effective_tongue} ||----w |")
             };
@@ -458,5 +502,12 @@ mod tests {
         let rendered = render_with_kind("hello", 40, "oo", "..", CowKind::Cow);
         assert!(rendered.contains(".. ||----w |"));
         assert!(!rendered.contains("||..----w |"));
+    }
+
+    #[test]
+    fn dragon_cowfile_uses_upstream_backslash_escapes() {
+        let rendered = render_with_kind("hello", 40, "oo", " ", CowKind::File("dragon".to_string()));
+        assert!(rendered.contains("@_^_@"));
+        assert!(!rendered.contains(r"\@_\^_\@"));
     }
 }
